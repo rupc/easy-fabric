@@ -1,0 +1,53 @@
+
+version: '3.7'
+networks:
+  test:
+    name: fabric_test
+services:
+  peer0.org7.example.com:
+    container_name: peer0.org7.example.com
+    image: hyperledger/fabric-peer:2.5.6
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_test
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      # - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/adminmsp
+      - CORE_PEER_ID=peer0.org7.example.com
+      - CORE_PEER_ADDRESS=peer0.org7.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org7.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org7.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org7.example.com:7051
+      - CORE_PEER_GOSSIP_ORGLEADER=true
+      - CORE_PEER_GOSSIP_USELEADERELECTION=false
+      - CORE_PEER_LOCALMSPID=Org7MSP
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.org7.example.com:9444
+      - CORE_METRICS_PROVIDER=prometheus
+      - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org7"}
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    volumes:
+      - ../organizations/peerOrganizations/org7.example.com/peers/peer0.org7.example.com:/etc/hyperledger/fabric
+      - ../organizations/peerOrganizations/org7.example.com/users/Admin@org7.example.com/msp:/etc/hyperledger/fabric/adminmsp
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/:/etc/hyperledger/fabric/orderercert
+      - ./data/peer0.org7.example.com:/var/hyperledger/production
+      - ./config:/etc/hyperledger/peercfg
+      - ../channel-artifacts:/etc/hyperledger/fabric/channel-artifacts
+      - ../chaincode:/etc/hyperledger/fabric/chaincode
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 7121:7051
+      - 9514:9444
+    networks:
+      - test
