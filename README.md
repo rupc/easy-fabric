@@ -1,6 +1,10 @@
 
 An effort to simplify the deployment management of high-complexity HLF (uses v2.5.6).
 
+# Motivation
+Due to its permissioned nature, HLF offers high customizability and high controllability. However, these features can also make the network really challenging to manage. So, this repository presents an effort to simplify the management process of HLF deployments for testing purpose.
+
+
 # 디렉토리 구성
 - deployment : docker 컨테이너 yaml 파일 관리
 - channel-artifacts: genesis.block 저장용
