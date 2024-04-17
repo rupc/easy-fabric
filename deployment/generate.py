@@ -15,6 +15,7 @@ services:
       service: hyperledger-fabric
     environment:
       - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - CORE_PEER_GATEWAY_ENABLED=true
       - FABRIC_LOGGING_SPEC=INFO
       #- FABRIC_LOGGING_SPEC=DEBUG
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_test
@@ -86,6 +87,7 @@ services:
       - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_SENDBUFFERSIZE=1000
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
       - ORDERER_ADMIN_TLS_ENABLED=true
       - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
@@ -113,7 +115,137 @@ services:
 """
 
 
-def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template):
+swarm_peer_template = """
+version: '3.7'
+networks:
+  hlfcaliper:
+    external: true
+services:
+  peer{index}_org{OrgIndex}_example_com:
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - "node.hostname != bsp-devel"
+          - "node.hostname != monitoring-server"
+    hostname: peer{index}.org{OrgIndex}.example.com
+    image: hyperledger/fabric-peer:2.5.6
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - CORE_PEER_GATEWAY_ENABLED=true
+      - FABRIC_LOGGING_SPEC=comm.grpc.server=ERROR:INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=hlfcaliper
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      # - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/adminmsp
+      - CORE_PEER_ID=peer{index}.org{OrgIndex}.example.com
+      - CORE_PEER_ADDRESS=peer{index}.org{OrgIndex}.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer{index}.org{OrgIndex}.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org{OrgIndex}.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer{index}.org{OrgIndex}.example.com:7051
+      - CORE_PEER_GOSSIP_ORGLEADER=true
+      - CORE_PEER_GOSSIP_USELEADERELECTION=false
+      - CORE_PEER_LIMITS_CONCURRENCY_ENDORSERSERVICE=250000
+      - CORE_PEER_LIMITS_CONCURRENCY_DELIVERSERVICE=250000
+      - CORE_PEER_LIMITS_CONCURRENCY_GATEWAYSERVICE=200000
+      - CORE_PEER_LOCALMSPID=Org{OrgIndex}MSP
+      - CORE_OPERATIONS_LISTENADDRESS=peer{index}.org{OrgIndex}.example.com:9444
+      - CORE_METRICS_PROVIDER=prometheus
+      - CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={{"peername":"peer{index}org{OrgIndex}"}}
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    volumes:
+      - /hyperledger/HLF/organizations/peerOrganizations/org{OrgIndex}.example.com/peers/peer{index}.org{OrgIndex}.example.com:/etc/hyperledger/fabric
+      - /hyperledger/HLF/organizations/peerOrganizations/org{OrgIndex}.example.com/users/Admin@org{OrgIndex}.example.com/msp:/etc/hyperledger/fabric/adminmsp
+      - /hyperledger/HLF/organizations/peerOrganizations/:/etc/hyperledger/fabric/peerOrganizations
+      - /hyperledger/HLF/organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/:/etc/hyperledger/fabric/orderercert
+      - /hyperledger/HLF/data/peer{index}.org{OrgIndex}.example.com:/var/hyperledger/production
+      - /hyperledger/HLF/config:/etc/hyperledger/peercfg
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /root
+    command: peer node start
+    ports:
+      - {peer_port}:7051
+      - {peer_ops_port}:9444
+    networks:
+      - hlfcaliper
+"""
+
+swarm_orderer_template = """
+version: '3.7'
+networks:
+  hlfcaliper:
+    external: true
+services:
+  orderer{index}_example_com:
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - "node.hostname == bsp-server-1"
+    hostname: orderer{index}.example.com
+    image: hyperledger/fabric-orderer:2.5.6
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+    #   - ORDERER_GENERAL_GENESISMETHOD=file
+    #   - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=file
+      - ORDERER_GENERAL_BOOTSTRAPFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      - ORDERER_OPERATIONS_LISTENADDRESS=orderer{index}.example.com:9443
+      - ORDERER_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: orderer
+    volumes:
+      - /hyperledger/HLF/organizations/ordererOrganizations/example.com/orderers/orderer{index}.example.com/msp:/var/hyperledger/orderer/msp
+      - /hyperledger/HLF/organizations/ordererOrganizations/example.com/orderers/orderer{index}.example.com/tls/:/var/hyperledger/orderer/tls
+      - /hyperledger/HLF/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp:/var/hyperledger/orderer/adminmsp
+      - /hyperledger/HLF/organizations/ordererOrganizations/example.com/tlsca:/var/hyperledger/orderer/tlsca
+      - /hyperledger/HLF/data/orderer{index}.example.com:/var/hyperledger/production/orderer
+      - /hyperledger/HLF/channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+      # - /hyperledger/HLF/../bin:/var/hyperledger/bin
+    ports:
+      - {orderer_port}:7050
+      - {orderer_admin_port}:7053
+      - {orderer_ops_port}:9443
+    networks:
+      - hlfcaliper
+"""
+
+
+
+
+def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template, swarm_peer_template, swarm_orderer_template):
     peer_port = 7051  # 외부로 노출되는 Peer 포트 시작 번호
     peer_ops_port = 9444
     orderer_port = 7050  # 외부로 노출되는 Orderer 포트 시작 번호
@@ -127,13 +259,19 @@ def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template
     # Generate peer YAML files
     for i in range(num_peers):
         file_name = f"peer{0}.org{i+1}.yaml"
+        swarm_file_name = f"swarm/peer{0}.org{i+1}.yaml"
         # file_name = f"peer{i+1}.org1.yaml"
         peer_port += 10
         peer_ops_port += 10
         content = peer_template.format(index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
- 
+        swarm_content = swarm_peer_template.format(index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
+        
         with open(file_name, "w") as file:
             file.write(content)
+            
+        with open(swarm_file_name, "w") as file:
+            file.write(swarm_content)
+            
         peers_combined['services'][f'peer{0}.org{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'peer{0}.org{i+1}.example.com']
         # peers_combined['services'][f'peer{i}.org{i}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'peer{i}.org1.example.com']
  
@@ -141,14 +279,19 @@ def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template
     # Generate orderer YAML files
     for i in range(num_orderers):
         file_name = f"orderer{i+1}.yaml"
+        swarm_file_name = f"swarm/orderer{i+1}.yaml"
         orderer_port += 10
         orderer_admin_port += 10
         orderer_ops_port += 10
         content = orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
+        swarm_content = swarm_orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
         # content = orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
  
         with open(file_name, "w") as file:
             file.write(content)
+            
+        with open(swarm_file_name, "w") as file:
+            file.write(swarm_content)
         # orderers_combined['services'][f'orderer{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])
         orderers_combined['services'][f'orderer{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'orderer{i+1}.example.com']
         
@@ -175,4 +318,4 @@ num_orderers = config['General']['NumOrderers']
 
 
 # Generate YAML files based on the configuration
-generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template)
+generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template, swarm_peer_template, swarm_orderer_template)

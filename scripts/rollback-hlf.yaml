@@ -1,0 +1,39 @@
+---
+- name: Archive and transfer directories to remote hosts
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Copy 'data-fendorse-anchors-smallbank' to a new directory and rename
+      ansible.builtin.copy:
+        src: "../deployment/backup/data-fendorse-anchors-smallbank.tar.gz"
+        dest: "/tmp/data.tar.gz"
+        remote_src: no
+
+- name: Transfer archives and extract on remote servers
+  hosts: bspserver
+  tasks:
+    - name: Remove the /hyperledger/HLF/data directory if it exists
+      ansible.builtin.file:
+        path: "/hyperledger/HLF/data"
+        state: absent
+
+    - name: Copy 'data.tar.gz' to remote
+      ansible.builtin.copy:
+        src: "/tmp/data.tar.gz"
+        dest: "/hyperledger/HLF/data.tar.gz"
+        mode: "0755"
+      tags:
+        - rollback
+
+    - name: Extract 'data.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/hyperledger/HLF/data.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: yes
+        mode: "0755"
+
+    - name: Rename directory from 'data-fendorse-anchors-smallbank' to 'data'
+      ansible.builtin.command:
+        cmd: mv /hyperledger/HLF/data-fendorse-anchors-smallbank /hyperledger/HLF/data
+        removes: /hyperledger/HLF/data-fendorse-anchors-smallbank
+        creates: /hyperledger/HLF/data

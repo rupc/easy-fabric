@@ -1,20 +1,17 @@
 #!/usr/bin/python3
 
 import yaml
+from string import Template
 from argparse import ArgumentParser
 
-
-# Parse command line arguments for the number of organizations
-# parser = ArgumentParser(description="Dynamically adjust the number of Orgs in a Fabric config template.")
-# parser.add_argument("--org_count", type=int, help="Number of organizations to be included in the configuration.", required=True)
-# args = parser.parse_args()
-
-template_yaml_content = """
+def generate_config(num_orgs, num_orderers):
+    # Base template for the YAML configuration
+    base_template = """
 Organizations:
   - &OrdererOrg
     Name: OrdererOrg
     ID: OrdererMSP
-    MSPDir: ../organizations/ordererOrganizations/example.com/msp
+    MSPDir: ../../organizations/ordererOrganizations/example.com/msp
     Policies:
       Readers:
         Type: Signature
@@ -26,51 +23,18 @@ Organizations:
         Type: Signature
         Rule: "OR('OrdererMSP.admin')"
     OrdererEndpoints:
-      - orderer1.example.com:7050
-      - orderer2.example.com:7052
-      - orderer3.example.com:7056
-      - orderer4.example.com:7058
-  - &Org1
-    Name: Org1MSP
-    ID: Org1MSP
-    MSPDir: ../organizations/peerOrganizations/org1.example.com/msp
-    Policies:
-      Readers:
-        Type: Signature
-        Rule: "OR('Org1MSP.admin', 'Org1MSP.peer', 'Org1MSP.client')"
-      Writers:
-        Type: Signature
-        Rule: "OR('Org1MSP.admin', 'Org1MSP.client')"
-      Admins:
-        Type: Signature
-        Rule: "OR('Org1MSP.admin')"
-      Endorsement:
-        Type: Signature
-        Rule: "OR('Org1MSP.peer')"
-  - &Org2
-    Name: Org2MSP
-    ID: Org2MSP
-    MSPDir: ../organizations/peerOrganizations/org2.example.com/msp
-    Policies:
-      Readers:
-        Type: Signature
-        Rule: "OR('Org2MSP.admin', 'Org2MSP.peer', 'Org2MSP.client')"
-      Writers:
-        Type: Signature
-        Rule: "OR('Org2MSP.admin', 'Org2MSP.client')"
-      Admins:
-        Type: Signature
-        Rule: "OR('Org2MSP.admin')"
-      Endorsement:
-        Type: Signature
-        Rule: "OR('Org2MSP.peer')"
+$orderer_endpoints
+
+$org_definitions
+
 Capabilities:
   Channel: &ChannelCapabilities
-    V3_0: true
+    V2_0: true
   Orderer: &OrdererCapabilities
     V2_0: true
   Application: &ApplicationCapabilities
     V2_5: true
+
 Application: &ApplicationDefaults
   Organizations:
   Policies:
@@ -82,35 +46,25 @@ Application: &ApplicationDefaults
       Rule: "ANY Writers"
     Admins:
       Type: ImplicitMeta
-      Rule: "MAJORITY Admins"
+      Rule: "ANY Admins"
     LifecycleEndorsement:
       Type: ImplicitMeta
-      Rule: "MAJORITY Endorsement"
+      Rule: "ANY Endorsement"
     Endorsement:
       Type: ImplicitMeta
-      Rule: "MAJORITY Endorsement"
+      Rule: "ANY Endorsement"
   Capabilities:
     <<: *ApplicationCapabilities
-Orderer:
-  &OrdererDefaults # Batch Timeout: The amount of time to wait before creating a batch
+
+Orderer: &OrdererDefaults
+  Addresses:
+$orderer_addresses
   BatchTimeout: 2s
-  # Batch Size: Controls the number of messages batched into a block
   BatchSize:
-    # Max Message Count: The maximum number of messages to permit in a batch
-    MaxMessageCount: 800
-    # Absolute Max Bytes: The absolute maximum number of bytes allowed for
-    # the serialized messages in a batch.
+    MaxMessageCount: 100
     AbsoluteMaxBytes: 99 MB
-    # Preferred Max Bytes: The preferred maximum number of bytes allowed for
-    # the serialized messages in a batch. A message larger than the preferred
-    # max bytes will result in a batch larger than preferred max bytes.
     PreferredMaxBytes: 4 MB
-  # Organizations is the list of orgs which are defined as participants on
-  # the orderer side of the network
   Organizations:
-  # Policies defines the set of policies at this level of the config tree
-  # For Orderer policies, their canonical path is
-  #   /Channel/Orderer/<PolicyName>
   Policies:
     Readers:
       Type: ImplicitMeta
@@ -120,138 +74,119 @@ Orderer:
       Rule: "ANY Writers"
     Admins:
       Type: ImplicitMeta
-      Rule: "MAJORITY Admins"
-    # BlockValidation specifies what signatures must be included in the block
-    # from the orderer for the peer to validate it.
+      Rule: "ANY Admins"
     BlockValidation:
       Type: ImplicitMeta
       Rule: "ANY Writers"
+
 Channel: &ChannelDefaults
-  # Policies defines the set of policies at this level of the config tree
-  # For Channel policies, their canonical path is
-  #   /Channel/<PolicyName>
   Policies:
-    # Who may invoke the 'Deliver' API
     Readers:
       Type: ImplicitMeta
       Rule: "ANY Readers"
-    # Who may invoke the 'Broadcast' API
     Writers:
       Type: ImplicitMeta
       Rule: "ANY Writers"
-    # By default, who may modify elements at this config level
     Admins:
       Type: ImplicitMeta
-      Rule: "MAJORITY Admins"
-  # Capabilities describes the channel level capabilities, see the
-  # dedicated Capabilities section elsewhere in this file for a full
-  # description
+      Rule: "ANY Admins"
   Capabilities:
     <<: *ChannelCapabilities
+
 Profiles:
-  ChannelUsingBFT:
+  ChannelUsingRaft:
     <<: *ChannelDefaults
+    Consortiums:
+      SampleConsortium:
+        Organizations:
+
     Orderer:
       <<: *OrdererDefaults
+      OrdererType: etcdraft
+      EtcdRaft:
+        Consenters:
+$consenters
       Organizations:
         - *OrdererOrg
       Capabilities: *OrdererCapabilities
-      OrdererType: BFT
-      SmartBFT:
-        RequestBatchMaxCount: 100
-        RequestBatchMaxInterval: 50ms
-        RequestForwardTimeout: 2s
-        RequestComplainTimeout: 20s
-        RequestAutoRemoveTimeout: 3m0s
-        ViewChangeResendInterval: 5s
-        ViewChangeTimeout: 20s
-        LeaderHeartbeatTimeout: 1m0s
-        CollectTimeout: 1s
-        RequestBatchMaxBytes: 10485760
-        IncomingMessageBufferSize: 200
-        RequestPoolSize: 100000
-        LeaderHeartbeatCount: 10
-      ConsenterMapping:
-        - ID: 1
-          Host: orderer1.example.com
-          Port: 7050
-          MSPID: OrdererMSP
-          Identity: ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp/signcerts/orderer1.example.com-cert.pem
-          ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
-          ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
-        - ID: 2
-          Host: orderer2.example.com
-          Port: 7052
-          MSPID: OrdererMSP
-          Identity: ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp/signcerts/orderer2.example.com-cert.pem
-          ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
-          ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
-        - ID: 3
-          Host: orderer3.example.com
-          Port: 7056
-          MSPID: OrdererMSP
-          Identity: ../organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/msp/signcerts/orderer3.example.com-cert.pem
-          ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
-          ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
-        - ID: 4
-          Host: orderer4.example.com
-          Port: 7058
-          MSPID: OrdererMSP
-          Identity: ../organizations/ordererOrganizations/example.com/orderers/orderer4.example.com/msp/signcerts/orderer4.example.com-cert.pem
-          ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer4.example.com/tls/server.crt
-          ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer4.example.com/tls/server.crt
     Application:
       <<: *ApplicationDefaults
       Organizations:
-        - *Org1
-        - *Org2
+$profile_orgs
       Capabilities: *ApplicationCapabilities
 """
 
-org_count = 3
-# org_count = args.org_count
+    # Create orderer endpoints and addresses
+    orderer_endpoints = "\n".join([f"      - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
+    orderer_addresses = "\n".join([f"    - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
+    consenters = "\n".join([f"          - Host: orderer{i+1}.example.com\n            Port: 7050\n            ClientTLSCert: ../../organizations/ordererOrganizations/example.com/orderers/orderer{i+1}.example.com/tls/server.crt\n            ServerTLSCert: ../../organizations/ordererOrganizations/example.com/orderers/orderer{i+1}.example.com/tls/server.crt"
+        for i in range(num_orderers)
+    ])
 
-data = yaml.safe_load(template_yaml_content)
+    # Create organization definitions
+    org_definitions = "\n".join([
+        f"""  - &Org{i+1}
+    Name: Org{i+1}MSP
+    ID: Org{i+1}MSP
+    MSPDir: ../../organizations/peerOrganizations/org{i+1}.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Org{i+1}MSP.admin', 'Org{i+1}MSP.peer', 'Org{i+1}MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Org{i+1}MSP.admin', 'Org{i+1}MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Org{i+1}MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Org{i+1}MSP.peer')" """
+        for i in range(num_orgs)
+    ])
 
-# Function to create org definition
-def create_org_definition(org_index):
-    return {
-        "Name": f"Org{org_index}MSP",
-        "ID": f"Org{org_index}MSP",
-        "MSPDir": f"../organizations/peerOrganizations/org{org_index}.example.com/msp",
-        "Policies": {
-            "Readers": {
-                "Type": "Signature",
-                "Rule": f"OR('Org{org_index}MSP.admin', 'Org{org_index}MSP.peer', 'Org{org_index}MSP.client')"
-            },
-            "Writers": {
-                "Type": "Signature",
-                "Rule": f"OR('Org{org_index}MSP.admin', 'Org{org_index}MSP.client')"
-            },
-            "Admins": {
-                "Type": "Signature",
-                "Rule": f"OR('Org{org_index}MSP.admin')"
-            },
-            "Endorsement": {
-                "Type": "Signature",
-                "Rule": f"OR('Org{org_index}MSP.peer')"
-            }
-        }
-    }
+    # application_orgs = "\n".join([f"  - *Org{i+1}" for i in range(num_orgs)])
+    profile_orgs = "\n".join([f"        - *Org{i+1}" for i in range(num_orgs)])
 
-# Adjust the number of orgs in the template
-data["Organizations"] = data["Organizations"][:2]  # Keep the OrdererOrg, remove existing peer orgs
-for i in range(1, org_count + 1):
-    OrgDefinition = create_org_definition(i)
-    data["Organizations"].append(create_org_definition(i))
+    # Fill the template
+    full_template = Template(base_template)
+    yaml_content = full_template.substitute(
+        orderer_endpoints=orderer_endpoints,
+        org_definitions=org_definitions,
+        orderer_addresses=orderer_addresses,
+        # application_orgs=application_orgs,
+        orderer_orgs="- *OrdererOrg",
+        consenters=consenters,
+        profile_orgs=profile_orgs
+    )
 
-# Adjust the number of orgs in the channel profile
-data["Profiles"]["ChannelUsingBFT"]["Application"]["Organizations"] = []
-for i in range(1, org_count + 1):
-    data["Profiles"]["ChannelUsingBFT"]["Application"]["Organizations"].append({"*Org": f"Org{i}"})
+    return yaml_content
 
-# Save the modified template to a new file
-with open(f"bftconfigtx_{org_count}_orgs.yaml", "w") as file:
-    yaml.dump(data, file, sort_keys=False)
+import os
+def main():
+    parser = ArgumentParser(description="Generate a Fabric configuration YAML file with dynamic number of orgs and orderers.")
+    parser.add_argument("--num_orgs", type=int, required=True, help="Number of organizations")
+    parser.add_argument("--num_orderers", type=int, required=True, help="Number of orderers")
+    args = parser.parse_args()
 
-print(f"Configuration with {org_count} organizations generated successfully.")
+    # Generate and print the YAML content
+    yaml_content = generate_config(args.num_orgs, args.num_orderers)
+    
+    configtxPath = f"configtx-{args.num_orgs}orgs-{args.num_orderers}orderers"
+    filename = f"configtx.yaml"
+
+    if not os.path.exists(configtxPath):
+      os.makedirs(configtxPath)
+      print(f"Directory created: {configtxPath}")
+    
+    # 파일 경로 결합
+    file_path = os.path.join(configtxPath, filename)
+    
+    # 파일 쓰기
+    with open(file_path, 'w') as file:
+        file.write(yaml_content)
+        print(f"File written: {file_path}")
+    # print(yaml_content)
+
+if __name__ == "__main__":
+    main()

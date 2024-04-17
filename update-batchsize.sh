@@ -1,0 +1,10 @@
+#!/bin/bash
+# change batch size to 100
+# CORE_PEER_ADDRESS=peer0.org1.example.com:7050 CORE_PEER_TLS_ENABLED=true CORE_PEER_MSPCONFIGPATH=../../organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/ FABRIC_CFG_PATH=./deployment/config CORE_PEER_LOCALMSPID=Org1MSP CORE_PEER_TLS_ROOTCERT_FILE=../../organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/tls/ca.crt  bins/bin-v2.5.6/peer channel update -f config_update_in_envelope.pb -o 141.223.121.57:7060 -c mychannel --tls --cafile ../../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt --ordererTLSHostnameOverride orderer1.example.com
+
+# CORE_PEER_ADDRESS=peer0.org1.example.com:7051 CORE_PEER_TLS_ENABLED=true CORE_PEER_MSPCONFIGPATH=../../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/ FABRIC_CFG_PATH=./deployment/config CORE_PEER_LOCALMSPID=Org1MSP CORE_PEER_TLS_ROOTCERT_FILE=../../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt  bins/bin-v2.5.6/peer channel update -f config_update_in_envelope.pb -o 141.223.121.57:7060 -c mychannel --tls --cafile ../../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt --ordererTLSHostnameOverride orderer1.example.com
+
+CORE_PEER_ADDRESS=orderer1.example.com:7050 CORE_PEER_TLS_ENABLED=true CORE_PEER_MSPCONFIGPATH=../../organizations/ordererOrganizations/example.com/users/Admin@example.com/msp FABRIC_CFG_PATH=./deployment/config CORE_PEER_LOCALMSPID=OrdererMSP CORE_PEER_TLS_ROOTCERT_FILE=../../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt  bins/bin-v2.5.6/peer channel update -f config_update_in_envelope.pb -o 141.223.121.57:7060 -c mychannel --tls --cafile ../../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt --ordererTLSHostnameOverride orderer1.example.com
+
+
+# peer channel update -f config_update_in_envelope.pb -c mychannel -o orderer.example.com:7050 --tls --cafile /path/to/orderer/ca.crt

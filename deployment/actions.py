@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # argparse를 사용하여 커맨드 라인 인자 처리
 parser = argparse.ArgumentParser(description='Manage chaincode on Fabric network.')
-parser.add_argument('action', type=str, choices=['join', 'install', 'instan', 'approve','commit'], help='Action to perform: join, install, or instan')
+parser.add_argument('action', type=str, choices=['join', 'install', 'instan', 'approve','commit', 'anchor_fetch','anchor'], help='Action to perform: join, install, or instan')
 args = parser.parse_args()
 
 # Read the bench-config.yaml
@@ -135,35 +135,50 @@ def instantiate_cc():
 # CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/adminmsp peer lifecycle chaincode queryapproved --channelID mychannel --name smallbank --sequence 1 --tls --cafile /etc/hyperledger/fabric/orderercert/tls/ca.crt
 # CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/adminmsp peer lifecycle chaincode queryinstalled
 
+# peer lifecycle chaincode approveformyorg -o orderer.example.com:7050 --channelID mychannel --name mycc --version 1.0 --sequence 1 --tls true --cafile /path/to/orderer/ca --signature-policy 
+
+# 체인코드 커밋 (이 명령은 채널의 모든 조직에 대해 실행해야 할 수도 있습니다)
+# peer lifecycle chaincode commit -o orderer.example.com:7050 --channelID mychannel --name mycc --version 1.0 --sequence 1 --tls true --cafile /path/to/orderer/ca --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /path/to/org1/peer0/tls/ca.crt --signature-policy "OR('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member', 'Org4MSP.member', 'Org5MSP.member', 'Org6MSP.member', 'Org7MSP.member', 'Org8MSP.member', 'Org9MSP.member', 'Org10MSP.member', 'Org11MSP.member', 'Org12MSP.member')"
+cli_container_name = "hyperledger/fabric-tools:2.5.6"
 
 endorsement_policy = "OutOf(4, 'Org1MSP.peer', 'Org2MSP.peer', 'Org3MSP.peer', 'Org4MSP.peer', 'Org5MSP.peer', 'Org6MSP.peer', 'Org7MSP.peer', 'Org8MSP.peer', 'Org9MSP.peer', 'Org10MSP.peer', 'Org11MSP.peer', 'Org12MSP.peer')"
+
+single_endorsement_policy = "OR('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member', 'Org4MSP.member', 'Org5MSP.member', 'Org6MSP.member', 'Org7MSP.member', 'Org8MSP.member', 'Org9MSP.member', 'Org10MSP.member', 'Org11MSP.member', 'Org12MSP.member')"
+sequence = "2"
 def approve():
     # package_id = "smallbank_v1.0:54fdc719a38bea2264e254342e9a47be265d0a761c55b3ebbe1ec690fc8efd13"  # 승인할 체인코드 패키지 ID
     package_id = "smallbank_v1.0:54fdc719a38bea2264e254342e9a47be265d0a761c55b3ebbe1ec690fc8efd13"  # 승인할 체인코드 패키지 ID
-
     print(package_id)
     # 승인 명령 구성
     for i in range(peer_count):
         peer_address = f"peer{0}.org{i+1}.example.com:7051"
+        peer_address_without_port = peer_address.split(":")[0]
         print("approve for", peer_address.split(":")[0])
         tls_root_cert_file = f"/etc/hyperledger/fabric/tls/ca.crt"
+
+
         command = [
-            "docker", "exec", 
-            peer_address.split(":")[0],
-            "env", f"CORE_PEER_ADDRESS={peer_address}",
-            f"CORE_PEER_TLS_ROOTCERT_FILE={tls_root_cert_file}",
+            "docker", "run", 
+            "--rm",
+            "--network", "hlfcaliper",
+            "-v", "/home/jyr/go/src/github.com/rupc/fabric-benchmarks/fabric-samples/bench-network/organizations:/organizations",
+            cli_container_name,
+            "env", 
+            f"CORE_PEER_TLS_ENABLED=true",
+            f"CORE_PEER_ADDRESS={peer_address}",
+            f"CORE_PEER_TLS_ROOTCERT_FILE=/organizations/peerOrganizations/org{i+1}.example.com/peers/{peer_address_without_port}/tls/ca.crt",
             f"CORE_PEER_LOCALMSPID=Org{i+1}MSP",
-            f"CORE_PEER_MSPCONFIGPATH={admin_msp_config_path}",
+            f"CORE_PEER_MSPCONFIGPATH=/organizations/peerOrganizations/org{i+1}.example.com/users/Admin@org{i+1}.example.com/msp",
             "peer", "lifecycle", "chaincode", "approveformyorg",
             "--channelID", channel_name,
             "--name", chaincode_name,
             "--version", chaincode_version,
             "--package-id", package_id,
-            "--sequence", "1",
+            "--sequence", sequence,
             "--tls", 
-            "--cafile", "/etc/hyperledger/fabric/orderercert/tls/ca.crt",
+            "--cafile", "/organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt",
             "--orderer", "orderer1.example.com:7050",
-            "--signature-policy", endorsement_policy
+            "--signature-policy", single_endorsement_policy
         ]
 
         result = subprocess.run(command, capture_output=True, text=True)
@@ -187,7 +202,7 @@ def commit():
     command = [
         "docker", "run", 
         "--rm",
-        "--network", "fabric_test",
+        "--network", "hlfcaliper",
         "-v", "/home/jyr/go/src/github.com/rupc/fabric-benchmarks/fabric-samples/bench-network/organizations:/organizations",
         cli_container_name,
         "env",
@@ -199,7 +214,7 @@ def commit():
         "--channelID", channel_name,
         "--name", chaincode_name,
         "--version", chaincode_version,
-        "--sequence", "1",
+        "--sequence", "2",
         "--tls", 
         "--cafile", "/organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt",
         "--orderer", "orderer1.example.com:7050",
@@ -227,7 +242,7 @@ def commit():
         "--tlsRootCertFiles", "/organizations/peerOrganizations/org11.example.com/peers/peer0.org11.example.com/tls/ca.crt",
         "--peerAddresses", "peer0.org12.example.com:7051", 
         "--tlsRootCertFiles", "/organizations/peerOrganizations/org12.example.com/peers/peer0.org12.example.com/tls/ca.crt",
-        "--signature-policy", endorsement_policy
+        "--signature-policy", single_endorsement_policy
     ]
     result = subprocess.run(command, capture_output=True, text=True)
     
@@ -236,6 +251,68 @@ def commit():
     else:
         print(f"Error committing chaincode: {result.stderr}")
 
+
+def set_anchor_peer(org_index):
+
+    anchor_peer_tx = f"Org{org_index}MSPanchors.tx"
+    configtxgen_cmd = [
+        "export CORE_PEER_LOCALMSPID "
+        "configtxgen",
+        "-profile", "YourChannelProfile",
+        "-outputAnchorPeersUpdate", anchor_peer_tx,
+        "-channelID", CHANNEL_NAME,
+        "-asOrg", f"Org{org_index}MSP"
+    ]
+    subprocess.run(configtxgen_cmd, check=True)
+
+    peer_cmd = [
+        "peer", "channel", "update",
+        "-f", anchor_peer_tx,
+        "-c", CHANNEL_NAME,
+        "-o", ORDERER_ADDRESS,
+        "--tls", "--cafile", ORDERER_CERT
+    ]
+    # MSP 설정이 필요할 수 있습니다. 예: CORE_PEER_LOCALMSPID 및 CORE_PEER_MSPCONFIGPATH
+    subprocess.run(peer_cmd, check=True)
+
+def anchor_fetch():
+    cli_container_name = "hyperledger/fabric-tools:2.5.6"
+    # ordererCaCert="../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt"
+    # peer_address="peer0.org1.example.com:7051"
+    # tls_root_cert_file="../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+    #   -e CORE_PEER_TLS_ROOTCERT_FILE=/fabric/config/peers/peer0.org1.example.com/tls/ca.crt \
+# peer channel fetch config config_block.pb -o [ORDERER_ADDRESS] -c [CHANNEL_NAME] --tls --cafile [ORDERER_CA]
+
+        # channel fetch config config_block.pb -o 0.0.0.0:7050 -c mychannel --tls --cafile ../../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt
+    command = [
+        "docker", "run", 
+        "--rm",
+        "--network", "fabric_test",
+        "-v", "/home/jyr/go/src/github.com/rupc/fabric-benchmarks/fabric-samples/bench-network/organizations:/organizations",
+        cli_container_name,
+        "env",
+        "CORE_PEER_MSPCONFIGPATH=/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp",
+        "CORE_PEER_TLS_ENABLED=true",
+        "CORE_PEER_TLS_ROOTCERT_FILE=/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt",
+        "CORE_PEER_LOCALMSPID=Org1MSP",
+        "peer", "channel", "fetch", "config", "config_block.pb",
+        "-o", "orderer1.example.com:7050",
+        "-c", channel_name,
+        "--tls", 
+        "--cafile", "/organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/ca.crt"
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print("Anchor fetch successfully.")
+    else:
+        print(f"Error Anchor fetch chaincode: {result.stderr}")
+
+def update_anchor():
+    NUM_ORGS=12
+    for org_index in range(1, NUM_ORGS + 1):
+        set_anchor_peer(org_index)
+    
 # 1. create channel (?) 할 필요 없음 in v2.5.6
 # 2. join channel 각자.
 # 3. install chain code 각자
@@ -247,6 +324,8 @@ actions = {
     'install': install_cc,
     'approve': approve,
     'commit': commit,
+    'anchor_fetch': anchor_fetch,
+    'anchor': update_anchor,
 }
 
 # 실행

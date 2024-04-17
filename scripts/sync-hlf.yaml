@@ -1,0 +1,98 @@
+---
+- name: Archive and transfer directories to remote hosts
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Archive the 'organizations' directory
+      ansible.builtin.archive:
+        path: "../organizations"
+        dest: "/tmp/organizations.tar.gz"
+        format: gz
+
+    - name: Archive the 'channel-artifacts' directory
+      ansible.builtin.archive:
+        path: "../channel-artifacts"
+        dest: "/tmp/channel-artifacts.tar.gz"
+        format: gz
+      tags:
+        - channel-artifacts
+
+    - name: Prepare 'data-fendorse-anchors-smallbank' directory and archive
+      block:
+        - name: Copy 'data-fendorse-anchors-smallbank' to a new directory and rename
+          ansible.builtin.copy:
+            src: "../deployment/backup/data-fendorse-anchors-smallbank.tar.gz"
+            dest: "/tmp/data.tar.gz"
+            remote_src: no
+          tags:
+            - rollback
+
+        # - name: Archive the 'data' directory
+        #   ansible.builtin.archive:
+        #     path: "/tmp/data"
+        #     dest: "/tmp/data.tar.gz"
+        #     format: gz
+
+    - name: Archive the 'config' directory
+      ansible.builtin.archive:
+        path: "../deployment/config"
+        dest: "/tmp/config.tar.gz"
+        format: gz
+
+- name: Transfer archives and extract on remote servers
+  hosts: bspserver
+  tasks:
+    - name: Remove the /hyperledger/HLF directory if it exists
+      ansible.builtin.file:
+        path: "/hyperledger/HLF"
+        state: absent
+
+    - name: Recreate the /hyperledger/HLF directory
+      ansible.builtin.file:
+        path: "/hyperledger/HLF"
+        state: directory
+        mode: "0755"
+
+    - name: Transfer and extract 'organizations.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/tmp/organizations.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: no
+        mode: "0755"
+
+    - name: Transfer and extract 'channel-artifacts.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/tmp/channel-artifacts.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: no
+        mode: "0755"
+      tags:
+        - channel-artifacts
+
+    - name: Copy 'data.tar.gz' to remote
+      ansible.builtin.copy:
+        src: "/tmp/data.tar.gz"
+        dest: "/hyperledger/HLF/data.tar.gz"
+        mode: "0755"
+      tags:
+        - rollback
+
+    - name: Extract 'data.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/hyperledger/HLF/data.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: yes
+        mode: "0755"
+
+    - name: Rename directory from 'data-fendorse-anchors-smallbank' to 'data'
+      ansible.builtin.command:
+        cmd: mv /hyperledger/HLF/data-fendorse-anchors-smallbank /hyperledger/HLF/data
+        removes: /hyperledger/HLF/data-fendorse-anchors-smallbank
+        creates: /hyperledger/HLF/data
+
+    - name: Transfer and extract 'config.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/tmp/config.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: no
+        mode: "0755"
