@@ -10,10 +10,9 @@ An effort to simplify the deployment management of high-complexity HLF (uses v2.
 - organizations : credentials (private/pubkey, certificate, users, tls...)
 - scripts : 기타 스크립트.
 - caliper-benchmarks : Examples using Caliper for Benchmarking HLF
-- 
-```bash
-# Basic Flow
 
+# Basic Flow
+```bash
 BINPATH=bins/bin-v2.5.6
 
 # 1. credential 생성 (using cryptogen)
