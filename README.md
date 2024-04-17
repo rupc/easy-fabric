@@ -59,7 +59,7 @@ docker-compose -f peers.yaml up -d
 ./actions.py commit
 
 # 8. 앵커피어 추가하는 트랜잭션 제출하기.
-# 앵커 피어를 추가해야 
+# 앵커 피어를 추가해야 cross-organizational 통신 가능. (즉, 서로 다른 조직간의 피어가 서로의 주소를 알게됨. HLF 는 별도의 조직 간 discovery 기능이 없는 듯)
 
 # 9. batch size 변경 등
 
