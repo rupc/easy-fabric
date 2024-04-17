@@ -8,7 +8,7 @@ Due to its permissioned nature, HLF offers high customizability and high control
 # 디렉토리 구성
 - deployment : docker 컨테이너 yaml 파일 관리
 - channel-artifacts: genesis.block 저장용
-- chaincode : chaincode 저장용. (체인코드 폴더 안에서, go mod tidy 로 go module 로 되어 있어야 패키징됨.)
+- chaincode : chaincode 저장용. (참고로, 체인코드 폴더 안에서, go mod tidy 로 go module 로 되어 있어야 패키징됨.)
 - configtx : genesis-block 정의용 설정 파일. 즉, 오더링 서비스 구성, 피어 조직 구성 등 설정.
 - cryptogen : credentials 생성하는 프로필 
 - organizations : credentials (private/pubkey, certificate, users, tls...)
@@ -42,6 +42,9 @@ vim bench-config.yaml 에서 peer, orderer 개수 조정.
 ./generate.py 
 
 # 5. HLF 네트워크 시작 (로컬 or 분산)
+# 주의: 이전 데이터 의존성 피하기 위해, 도커상 volume 맵핑된 데이터는 모두 삭제하기.  (또는, 따로 archiving)
+# 분산 실험시에는, 원격 머신의 HLF volume 맵핑 경로 확인 (organizations + genesis.block)
+
 # 5-1). 로컬 환경상 HLF 네트워크 생성
 docker-compose -f orderers.yaml up -d
 docker-compose -f peers.yaml up -d
@@ -62,7 +65,7 @@ docker-compose -f peers.yaml up -d
 ./actions.py commit
 
 # 8. 앵커피어 추가하는 트랜잭션 제출하기.
-# 앵커 피어를 추가해야 cross-organizational 통신 가능. (즉, 서로 다른 조직간의 피어가 서로의 주소를 알게됨. HLF 는 별도의 조직 간 discovery 기능이 없는 듯)
+# 앵커 피어를 추가해야 cross-organizational 통신 가능. (즉, 서로 다른 조직간의 피어가 서로의 주소를 알게됨. 용도: Endorsement policy > 1 인 경우, 다른 조직 피어 주소를 알아야 하는데, 이때 앵커 피어 TX 를 제출해야지 endorsements 를 다른 조직 피어들로부터 확보 가능했음을 확인.)
 
 # 9. batch size 변경 등
 
