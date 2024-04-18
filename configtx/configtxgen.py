@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
+import os
 import yaml
 from string import Template
 from argparse import ArgumentParser
+
 
 def generate_config(num_orgs, num_orderers):
     # Base template for the YAML configuration
@@ -61,7 +63,7 @@ Orderer: &OrdererDefaults
 $orderer_addresses
   BatchTimeout: 2s
   BatchSize:
-    MaxMessageCount: 100
+    MaxMessageCount: 500
     AbsoluteMaxBytes: 99 MB
     PreferredMaxBytes: 4 MB
   Organizations:
@@ -117,11 +119,13 @@ $profile_orgs
 """
 
     # Create orderer endpoints and addresses
-    orderer_endpoints = "\n".join([f"      - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
-    orderer_addresses = "\n".join([f"    - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
+    orderer_endpoints = "\n".join(
+        [f"      - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
+    orderer_addresses = "\n".join(
+        [f"    - orderer{i+1}.example.com:7050" for i in range(num_orderers)])
     consenters = "\n".join([f"          - Host: orderer{i+1}.example.com\n            Port: 7050\n            ClientTLSCert: ../../organizations/ordererOrganizations/example.com/orderers/orderer{i+1}.example.com/tls/server.crt\n            ServerTLSCert: ../../organizations/ordererOrganizations/example.com/orderers/orderer{i+1}.example.com/tls/server.crt"
-        for i in range(num_orderers)
-    ])
+                            for i in range(num_orderers)
+                            ])
 
     # Create organization definitions
     org_definitions = "\n".join([
@@ -162,31 +166,35 @@ $profile_orgs
 
     return yaml_content
 
-import os
+
 def main():
-    parser = ArgumentParser(description="Generate a Fabric configuration YAML file with dynamic number of orgs and orderers.")
-    parser.add_argument("--num_orgs", type=int, required=True, help="Number of organizations")
-    parser.add_argument("--num_orderers", type=int, required=True, help="Number of orderers")
+    parser = ArgumentParser(
+        description="Generate a Fabric configuration YAML file with dynamic number of orgs and orderers.")
+    parser.add_argument("--num_orgs", type=int, required=True,
+                        help="Number of organizations")
+    parser.add_argument("--num_orderers", type=int,
+                        required=True, help="Number of orderers")
     args = parser.parse_args()
 
     # Generate and print the YAML content
     yaml_content = generate_config(args.num_orgs, args.num_orderers)
-    
+
     configtxPath = f"configtx-{args.num_orgs}orgs-{args.num_orderers}orderers"
     filename = f"configtx.yaml"
 
     if not os.path.exists(configtxPath):
-      os.makedirs(configtxPath)
-      print(f"Directory created: {configtxPath}")
-    
+        os.makedirs(configtxPath)
+        print(f"Directory created: {configtxPath}")
+
     # 파일 경로 결합
     file_path = os.path.join(configtxPath, filename)
-    
+
     # 파일 쓰기
     with open(file_path, 'w') as file:
         file.write(yaml_content)
         print(f"File written: {file_path}")
     # print(yaml_content)
+
 
 if __name__ == "__main__":
     main()

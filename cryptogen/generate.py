@@ -1,10 +1,23 @@
 #!/usr/bin/python3
 import argparse
+import os
+import shutil
 
 def generate_yaml_files(num_orgs, num_orderers):
     peer_orgs = []
     orderer_orgs = []
+    
+    directory_name=f"organizations-{num_orgs}orgs-{num_orderers}orderers"
 
+  # Check if the directory already exists
+    if os.path.exists(directory_name):
+        # Remove the directory if it exists
+        shutil.rmtree(directory_name)
+        print(f"Existing directory '{directory_name}' has been removed.")
+    
+    # Create the directory
+    os.makedirs(directory_name)
+    
     # Generate Peer Organizations
     for i in range(1, num_orgs + 1):
         peer_org = f"""
@@ -20,10 +33,12 @@ def generate_yaml_files(num_orgs, num_orderers):
 """
         peer_orgs.append(peer_org)
 
+
     # Write to Peer Organizations YAML file
     peer_yaml_content = "PeerOrgs:\n" + "".join(peer_orgs)
     peer_file_name = f"crypto-config-{num_orgs}-org.yaml"
-    with open(peer_file_name, 'w') as file:
+    
+    with open(os.path.join(directory_name, peer_file_name), 'w') as file:
         file.write(peer_yaml_content)
     print(f"YAML file '{peer_file_name}' has been created for peer organizations.")
         # Generate Orderer Organizations
@@ -50,11 +65,12 @@ def generate_yaml_files(num_orgs, num_orderers):
 OrdererOrgs:
 {orderer_org}
 """
-    print(orderer_org)
+    # print(orderer_org)
     # Write to Orderer Organizations YAML file
     # orderer_yaml_content = "OrdererOrgs:\n" + "".join(orderer_orgs)
+    
     orderer_file_name = f"crypto-config-{num_orderers}-orderer.yaml"
-    with open(orderer_file_name, 'w') as file:
+    with open(os.path.join(directory_name, orderer_file_name), 'w') as file:
         file.write(yaml_content)
 
     # with open(orderer_file_name, 'w') as file:

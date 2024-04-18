@@ -5,37 +5,46 @@
   tasks:
     - name: Archive the 'organizations' directory
       ansible.builtin.archive:
-        path: "../organizations"
+        path: "../../organizations"
         dest: "/tmp/organizations.tar.gz"
         format: gz
 
     - name: Archive the 'channel-artifacts' directory
       ansible.builtin.archive:
-        path: "../channel-artifacts"
+        path: "../../channel-artifacts"
         dest: "/tmp/channel-artifacts.tar.gz"
         format: gz
       tags:
         - channel-artifacts
 
-    - name: Prepare 'data-fendorse-anchors-smallbank' directory and archive
+    # - name: Prepare 'data-fendorse-anchors-smallbank' directory and archive
+    #   block:
+    #     - name: Copy 'data-fendorse-anchors-smallbank' to a new directory and rename
+    #       ansible.builtin.copy:
+    #         src: "../deployment/backup/data-fendorse-anchors-smallbank.tar.gz"
+    #         dest: "/tmp/data.tar.gz"
+    #         remote_src: no
+    #       tags:
+    #         - rollback
+    - name: Prepare 'data' directory and archive
       block:
-        - name: Copy 'data-fendorse-anchors-smallbank' to a new directory and rename
+        - name: Copy 'data' to a new directory and rename
           ansible.builtin.copy:
-            src: "../deployment/backup/data-fendorse-anchors-smallbank.tar.gz"
+            src: "../data.tar.gz"
             dest: "/tmp/data.tar.gz"
             remote_src: no
           tags:
             - rollback
 
-        # - name: Archive the 'data' directory
-        #   ansible.builtin.archive:
-        #     path: "/tmp/data"
-        #     dest: "/tmp/data.tar.gz"
-        #     format: gz
+    # - name: Archive the 'data' directory
+    #   ansible.builtin.archive:
+    #     path: "/tmp/data"
+    #     dest: "/tmp/data.tar.gz"
+    #     format: gz
 
     - name: Archive the 'config' directory
       ansible.builtin.archive:
-        path: "../deployment/config"
+        path: "../config"
         dest: "/tmp/config.tar.gz"
         format: gz
 
@@ -69,6 +78,13 @@
       tags:
         - channel-artifacts
 
+    - name: Transfer and extract 'config.tar.gz' on remote
+      ansible.builtin.unarchive:
+        src: "/tmp/config.tar.gz"
+        dest: "/hyperledger/HLF"
+        remote_src: no
+        mode: "0755"
+
     - name: Copy 'data.tar.gz' to remote
       ansible.builtin.copy:
         src: "/tmp/data.tar.gz"
@@ -84,15 +100,8 @@
         remote_src: yes
         mode: "0755"
 
-    - name: Rename directory from 'data-fendorse-anchors-smallbank' to 'data'
-      ansible.builtin.command:
-        cmd: mv /hyperledger/HLF/data-fendorse-anchors-smallbank /hyperledger/HLF/data
-        removes: /hyperledger/HLF/data-fendorse-anchors-smallbank
-        creates: /hyperledger/HLF/data
-
-    - name: Transfer and extract 'config.tar.gz' on remote
-      ansible.builtin.unarchive:
-        src: "/tmp/config.tar.gz"
-        dest: "/hyperledger/HLF"
-        remote_src: no
-        mode: "0755"
+    # - name: Rename directory from 'data-fendorse-anchors-smallbank' to 'data'
+    #   ansible.builtin.command:
+    #     cmd: mv /hyperledger/HLF/data-fendorse-anchors-smallbank /hyperledger/HLF/data
+    #     removes: /hyperledger/HLF/data-fendorse-anchors-smallbank
+    #     creates: /hyperledger/HLF/data

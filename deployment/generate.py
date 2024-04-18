@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import yaml
+import os
+import shutil
 
 peer_template = """
 version: '3.7'
@@ -67,6 +69,7 @@ networks:
 services:
   orderer{index}.example.com:
     container_name: orderer{index}.example.com
+    hostname: orderer{index}.example.com
     image: hyperledger/fabric-orderer:2.5.6
     labels:
       service: hyperledger-fabric
@@ -243,8 +246,6 @@ services:
 """
 
 
-
-
 def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template, swarm_peer_template, swarm_orderer_template):
     peer_port = 7051  # 외부로 노출되는 Peer 포트 시작 번호
     peer_ops_port = 9444
@@ -252,10 +253,17 @@ def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template
     orderer_admin_port = 7053  # 외부로 노출되는 Orderer 포트 시작 번호
     orderer_ops_port = 9443  # 외부로 노출되는 Orderer 포트 시작 번호
 
-    peers_combined = {'version': '3.7', 'networks': {'test': {'name': 'fabric_test'}}, 'services': {}}
-    orderers_combined = {'version': '3.7', 'networks': {'test': {'name': 'fabric_test'}}, 'services': {}}
+    peers_combined = {'version': '3.7', 'networks': {
+        'test': {'name': 'fabric_test'}}, 'services': {}}
+    orderers_combined = {'version': '3.7', 'networks': {
+        'test': {'name': 'fabric_test'}}, 'services': {}}
 
- 
+    if os.path.exists("./swarm"):
+        # 디렉토리가 존재하면 삭제
+        shutil.rmtree("./swarm")
+        # Ensure the swarm directory exists
+    os.makedirs("./swarm", exist_ok=True)
+
     # Generate peer YAML files
     for i in range(num_peers):
         file_name = f"peer{0}.org{i+1}.yaml"
@@ -263,18 +271,21 @@ def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template
         # file_name = f"peer{i+1}.org1.yaml"
         peer_port += 10
         peer_ops_port += 10
-        content = peer_template.format(index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
-        swarm_content = swarm_peer_template.format(index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
-        
-        with open(file_name, "w") as file:
-            file.write(content)
-            
+        content = peer_template.format(
+            index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
+        swarm_content = swarm_peer_template.format(
+            index=0, OrgIndex=i+1, peer_port=peer_port, peer_ops_port=peer_ops_port)
+
+        # with open(file_name, "w") as file:
+        #     file.write(content)
+
         with open(swarm_file_name, "w") as file:
             file.write(swarm_content)
-            
-        peers_combined['services'][f'peer{0}.org{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'peer{0}.org{i+1}.example.com']
+            print("generated: ", swarm_file_name)
+
+        peers_combined['services'][f'peer{0}.org{i+1}.example.com'] = yaml.safe_load(
+            content.split('services:\n')[1].split('\n\n')[0])[f'peer{0}.org{i+1}.example.com']
         # peers_combined['services'][f'peer{i}.org{i}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'peer{i}.org1.example.com']
- 
 
     # Generate orderer YAML files
     for i in range(num_orderers):
@@ -283,28 +294,29 @@ def generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template
         orderer_port += 10
         orderer_admin_port += 10
         orderer_ops_port += 10
-        content = orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
-        swarm_content = swarm_orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
+        content = orderer_template.format(index=i+1, orderer_port=orderer_port,
+                                          orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
+        swarm_content = swarm_orderer_template.format(
+            index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
         # content = orderer_template.format(index=i+1, orderer_port=orderer_port, orderer_admin_port=orderer_admin_port, orderer_ops_port=orderer_ops_port)
- 
-        with open(file_name, "w") as file:
-            file.write(content)
-            
+
+        # with open(file_name, "w") as file:
+        #     file.write(content)
+
         with open(swarm_file_name, "w") as file:
             file.write(swarm_content)
+            print("generated: ", swarm_file_name)
         # orderers_combined['services'][f'orderer{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])
-        orderers_combined['services'][f'orderer{i+1}.example.com'] = yaml.safe_load(content.split('services:\n')[1].split('\n\n')[0])[f'orderer{i+1}.example.com']
-        
+        orderers_combined['services'][f'orderer{i+1}.example.com'] = yaml.safe_load(
+            content.split('services:\n')[1].split('\n\n')[0])[f'orderer{i+1}.example.com']
 
- 
      # Write combined peers.yaml
     with open('peers.yaml', 'w') as file:
         yaml.dump(peers_combined, file)
-        
+
     # Write combined orderers.yaml
     with open('orderers.yaml', 'w') as file:
         yaml.dump(orderers_combined, file)
-
 
 
 # Read the bench-config.yaml
@@ -318,4 +330,5 @@ num_orderers = config['General']['NumOrderers']
 
 
 # Generate YAML files based on the configuration
-generate_yaml_files(num_peers, num_orderers, peer_template, orderer_template, swarm_peer_template, swarm_orderer_template)
+generate_yaml_files(num_peers, num_orderers, peer_template,
+                    orderer_template, swarm_peer_template, swarm_orderer_template)

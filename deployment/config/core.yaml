@@ -260,12 +260,12 @@ peer:
             # other peers
             responseTimeout: 3s
             # batchSize the number of blocks to request via state transfer from another peer
-            batchSize: 10
+            batchSize: 100
             # blockBufferSize reflects the size of the re-ordering buffer
             # which captures blocks and takes care to deliver them in order
             # down to the ledger layer. The actual buffer size is bounded between
             # 0 and 2*blockBufferSize, each channel maintains its own buffer
-            blockBufferSize: 20
+            blockBufferSize: 200
             # maxRetries maximum number of re-tries to ask
             # for single state transfer request
             maxRetries: 3
@@ -487,11 +487,11 @@ peer:
         concurrency:
             # endorserService limits concurrent requests to endorser service that handles chaincode deployment, query and invocation,
             # including both user chaincodes and system chaincodes.
-            endorserService: 250000
+            endorserService: 500000
             # deliverService limits concurrent event listeners registered to deliver service for blocks and transaction events.
-            deliverService: 250000
+            deliverService: 500000
             # gatewayService limits concurrent requests to gateway service that handles the submission and evaluation of transactions.
-            gatewayService: 50000
+            gatewayService: 500000
 
     # Since all nodes should be consistent it is recommended to keep
     # the default value of 100MB for MaxRecvMsgSize & MaxSendMsgSize
