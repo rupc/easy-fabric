@@ -122,6 +122,11 @@ bench-config.yaml 조정. (NumClusters 는 한 컨테이너에 여러 워커들�
 # benchConfig, networkConfig 는 컨테이너 안에 포함하므로, 관련 파일 갱신 후, 반드시 컨테이너 재빌드.
 ./build.sh 
 ./deploy.sh
+
+# mosquitto for communication broker between bench manager and workers.
+cd benchmarks/bench_mqtt
+docker-compose -f mosquitto-local.yaml up -d
+
 ```sh
 
 # Etc. Tips
