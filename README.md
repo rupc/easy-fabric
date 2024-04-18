@@ -119,7 +119,8 @@ cd to benchclient
 worker 개수 조정하고, ()
 bench-config.yaml 조정. (NumClusters 는 한 컨테이너에 여러 워커들을 그룹핑. 이는 컨테이너 개수가 많아지는 경우, swarm services가 정상적으로 배포되지 않는 docker swarm 의 한계로 인해 필요.)
 ./generate.py
-./build.sh
+# benchConfig, networkConfig 는 컨테이너 안에 포함하므로, 관련 파일 갱신 후, 반드시 컨테이너 재빌드.
+./build.sh 
 ./deploy.sh
 ```sh
 
