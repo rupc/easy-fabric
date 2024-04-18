@@ -81,6 +81,7 @@ docker-compose -f peers.yaml up -d
 ```
 
 ### Change Profile and Launch Swarm Network
+```sh
 cd deployment
 rm data.tar.gz
 rm data -rf
@@ -115,10 +116,12 @@ ansible-playbook -f 8 ansible/sync-hlf.yaml -u root
 ./swarm-deploy.py
 
 cd to benchclient
-worker 개수 조정하고, 
+worker 개수 조정하고, ()
+bench-config.yaml 조정. (NumClusters 는 한 컨테이너에 여러 워커들을 그룹핑. 이는 컨테이너 개수가 많아지는 경우, swarm services가 정상적으로 배포되지 않는 docker swarm 의 한계로 인해 필요.)
 ./generate.py
 ./build.sh
 ./deploy.sh
+```sh
 
 # Etc. Tips
 
