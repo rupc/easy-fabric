@@ -4,8 +4,11 @@ An effort to simplify the deployment management of high-complexity HLF (uses v2.
 # Motivation
 Due to its permissioned nature, HLF offers high customizability and high controllability. However, these features can also make the network really challenging to manage. So, this repository presents an effort to simplify the management process of HLF deployments for testing purpose.
 
-# Challenges : Configuration Automation
-Automatically generating configurations from simple inputs (e.g., number of orgs, number of orderers, number of peers per orgs)
+# Challenges : Automating congiruation generation and deployment 
+Automatically generating configurations from simple inputs (e.g., number of orgs, number of orderers, number of peers per orgs).
+Existing [fabric-samples](https://github.com/hyperledger/fabric-samples/tree/main/test-network) provides only hardcoded configurations (e.g., number of orgs, peers, and orderers), which requires further efforts for different configurations.
+Considering the HLF complexity, it is not straightforward to fully automating the entire process from the very beginning of generating crypto materials to final deployment on distributed network (e.g, docker swarm or k8s).
+
   
 
 # 디렉토리 구성
