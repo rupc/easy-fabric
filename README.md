@@ -59,11 +59,11 @@ docker-compose -f peers.yaml up -d
 # swarm/*.yaml 모두 실행.
 ./swarm-deploy.py
 
-# 6. 각 피어를 채널에 조인 시키기. (각자 수행)
+# 6. 각 피어를 채널에 조인 시키기. (각자 수행, 병렬)
 ./actions.py join
 
 # 7. 체인 코드 설치, 승인, 배포
-# 7-1. 체인코드 패키지를 각 피어에 대해 설치 (각자 수행)
+# 7-1. 체인코드 패키지를 각 피어에 대해 설치 (각자 수행, 병렬)
 ./actions.py install
 # 7-2. 체인코드 패키지를 각 피어들(orgs)로부터 승인 (각자 수행). Endorsement Policy 설정 가능
 ./actions.py approve 
@@ -71,12 +71,54 @@ docker-compose -f peers.yaml up -d
 ./actions.py commit
 
 # 8. 앵커피어 추가하는 트랜잭션 제출하기.
-# 앵커 피어를 추가해야 cross-organizational 통신 가능. (즉, 서로 다른 조직간의 피어가 서로의 주소를 알게됨. 용도: Endorsement policy > 1 인 경우, 다른 조직 피어 주소를 알아야 하는데, 이때 앵커 피어 TX 를 제출해야지 endorsements 를 다른 조직 피어들로부터 확보 가능했음을 확인.)
+# 필요성: 앵커 피어를 추가해야 cross-organizational 통신 가능. (즉, 서로 다른 조직간의 피어가 서로의 주소를 알게됨. 
+# Endorsement policy > 1 인 경우, 다른 조직 피어 주소를 알아야 하는데, 이때 앵커 피어 TX 를 제출해야지 endorsements 를 다른 조직 피어들로부터 확보 가능함을 확인.)
 
 # 9. batch size 변경 등
-
+# 기본 구성은, 시스템 설정 변경에 Majority 서명 받는 것이나, 이는 매우 비효율적. 
+# 테스트 용도로는 한 조직의 서명만 허용하도록 설정 필요. 
+# 과정. 오더러로부터 채널 설정 다운로드하고, 이를 json 으로 변경 후, 그 안에서 batch size 항목을 변경하고, 다시 이를 트랜잭션으로 서명하고, 최종적으로 오더러에 제출하는
 ```
 
+### Change Profile and Launch Swarm Network
+cd deployment
+rm data.tar.gz
+rm data -rf
+bench-config.yaml // General.NumPeers, General.NumOrderers 수정
+./generate.py
+
+cd ..
+rm organizations -rf
+
+cd cryptogen
+../bins/bin-v2.5.6/cryptogen generate --config=./organizations-12orgs-3orderers/crypto-config-12-org.yaml --output="organizations-12orgs-3orderers"   
+../bins/bin-v2.5.6/cryptogen generate --config=./organizations-12orgs-3orderers/crypto-config-3-orderer.yaml --output="organizations-12orgs-3orderers"
+
+cd ..
+cp cryptogen/organizations-12orgs-3orderers  organizations -rf         
+bins/bin-v2.5.6/configtxgen -profile ChannelUsingRaft -configPath ./configtx/configtx-12orgs-3orderers/ -outputBlock "./channel-artifacts/genesis.block" -channelID mychannel        
+
+cd deployment
+docker-compose -f orderers.yaml -f peers.yaml up -d
+
+./actions.py join
+./actions.py install
+./actions.py approve
+./actions.py commit
+
+# data (체인데이터)를 tar 허용
+sudo chown -R $(whoami) . && sudo chgrp -R $(whoami) .
+tar -czf data.tar.gz data
+docker-compose -f orderers.yaml -f peers.yaml down
+ansible-playbook -f 8 ansible/sync-hlf.yaml -u root
+
+./swarm-deploy.py
+
+cd to benchclient
+worker 개수 조정하고, 
+./generate.py
+./build.sh
+./deploy.sh
 
 # Etc. Tips
 
